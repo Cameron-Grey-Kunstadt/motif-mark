@@ -2,12 +2,13 @@
 # UO import debugpy, platform
 # 2/27/2025
 
-#TODO: function to find exons
+#TODO: deal with the weird ys in the unique motifs list, 
 
 import argparse
-import re
+import re, os
 import bioinfo
-import os
+import cairo
+import random
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--fasta",)  
@@ -27,7 +28,7 @@ class FastaRecord:
             self.seq = bioinfo.reverse_compliment(seq)
 
         self.unique_motif_list = unique_motif_list
-        self.motif_object_list = []
+        self.motif_object_list = self.find_motifs(self.seq, self.unique_motif_list)
         self.exon_start, self.exon_stop = self.get_exon_range(seq)
 
     
@@ -58,48 +59,83 @@ class FastaRecord:
 
         return exon_start, exon_stop
     
-    # def find_motifs(self, seq, unique_motif_list):
-    #     '''Searches for all the instances of motifs in the given sequence
-    #     and creates motif objects for each of them'''
-    #     for motif in unique_motif_list:
-    #         motif_instances = list(re.findall)
-    #     return 0
+    def find_motifs(self, seq, unique_motif_list):
+        '''Searches for all the instances of motifs in the given sequence
+        and creates motif objects for each of them'''
+        motif_objects_list = []
 
-seq = "asdkjfnkjcatJNKJNKJNKBcatjnkjncat"
-motif = "cat"
+        for unique_motif in unique_motif_list:
+            motif_instances = list(re.finditer(unique_motif, seq))
+            for motif_instance in motif_instances:
+                motif_span = motif_instance.span()
+                motif_start = motif_span[0]
+                motif_stop = motif_span[1]
 
-def find_motif(seq, motif):
-    motif_instances = list(re.finditer(motif, seq))
+                motif_object = Motif(unique_motif, unique_motif_color_dict[unique_motif], len(seq), motif_start, motif_stop)
+                motif_objects_list.append(motif_object)
 
-    print(motif_instances)
-
-    for instance in motif_instances:
-        x = instance.span()
-        print(x[0])
-        print(instance.span())
-
-find_motif(seq, motif)
-
-# class MotifClass:
-#     def __init__(self, motif, color, seq_length, exon_start, exon_stop):
-#         self.motif = motif
-#         self.color = color
-#         self.seq_length = seq_length
-#         self.exon_start = exon_start
-#         self.exon_stop = exon_stop
-
-#     def draw_line(self):
-#         return None
+        return motif_objects_list
 
 
+class Motif:
+    def __init__(self, motif, color, seq_length, motif_start, motif_stop):
+        self.motif = motif
+        self.color = color
+        self.seq_length = seq_length
+        self.motif_start = motif_start
+        self.motif_stop = motif_stop
 
+    def draw_line(self, x, y):
+        r, g, b = self.color
+
+        ctx.set_source_rgb(r/255, g/255, b/255)
+        ctx.rectangle(x, y, 5, 50)
+        ctx.fill()
+        ctx.stroke()
+
+
+def random_color_generator():
+    r = random.randint(0, 255)
+    g = random.randint(0, 0)
+    b = random.randint(0, 255)
+    return (r, g, b)
+
+
+# Set surface, paint white
+surface = cairo.ImageSurface(cairo.FORMAT_RGB24, 700, 350)
+ctx = cairo.Context(surface)
+ctx.set_source_rgb(255, 255, 255)
+ctx.paint()
+
+# Set main line as black, stroke
+ctx.set_source_rgb(0, 0, 0)
+ctx.move_to(25,175)
+ctx.line_to(675, 175)
+ctx.set_line_width(10)
+
+ctx.stroke()
+
+# Set Exon, fill, stroke
+ctx.set_source_rgb(0.4, 0.9, 0.4)
+ctx.rectangle(200, 150, 300, 50)
+
+ctx.fill()
+ctx.stroke()
+
+
+# Create unique list of motifs, assign each a unique random color and put into dictionary
 unique_motif_list = []
+unique_motif_color_dict = {}
 
 with open(args.motif, 'r') as motif_file:
-    for line in motif_file:
-        unique_motif_list.append(line.strip())
+    for line in motif_file: unique_motif_list.append(line.strip())
 
+for unique_motif in unique_motif_list: unique_motif_color_dict[unique_motif] = random_color_generator()
+
+
+# Not assuming the incoming file is oneline, so a temp one-line fasta file is created
 bioinfo.oneline_fasta(args.fasta, "temp_oneline.fasta")
+
 
 with open("temp_oneline.fasta", 'r') as fasta:
     while True:
@@ -109,8 +145,9 @@ with open("temp_oneline.fasta", 'r') as fasta:
         seq = fasta.readline()
 
         record = FastaRecord(header, seq, unique_motif_list)
-        #print(record)
+        for motif in record.motif_object_list:
+            motif.draw_line(motif.motif_start,150)
+
 
 os.remove('temp_oneline.fasta')
-
-
+surface.write_to_png('test_rect_and_line.png')
