@@ -1,14 +1,18 @@
-# Cameron Kunstadt
-# UO import debugpy, platform
-# 2/27/2025
-
-#TODO: deal with the weird ys in the unique motifs list, 
-
 import argparse
 import re, os
 import bioinfo
 import cairo
 import random
+# Cameron Kunstadt
+# UO BGMP
+# 2/27/2025
+
+#TODO: 
+# - deal with the weird ys in the unique motifs list
+# - basically scale nt to pixels
+# - allow for the printout of multiple record graphs
+# - add labels and key
+# - find better ways to add color
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--fasta",)  
@@ -17,6 +21,9 @@ args = parser.parse_args()
 
 
 class FastaRecord:
+    '''A FastaRecord object serves to parse and hold useful information from a FASTA header
+    and a FASTA sequence, and to find motifs within the sequence, based on the given unique_motif_list.
+    Motifs are create as Motif objects, and saved in a list.'''
     def __init__(self, header, seq, unique_motif_list):
         self.header = header
         self.seq = seq
@@ -78,6 +85,8 @@ class FastaRecord:
 
 
 class Motif:
+    '''A Motif object holds important information about the motifs found in a given
+    FASTA record, and allows for easy drawing on a pycairo context.'''
     def __init__(self, motif, color, seq_length, motif_start, motif_stop):
         self.motif = motif
         self.color = color
@@ -93,12 +102,16 @@ class Motif:
         ctx.fill()
         ctx.stroke()
 
-
+# I will probably delete this, this isn't my favorite
 def random_color_generator():
     r = random.randint(0, 255)
     g = random.randint(0, 0)
     b = random.randint(0, 255)
     return (r, g, b)
+
+def convert_bp_to_pixels(basepairs):
+    return None
+
 
 
 # Set surface, paint white
