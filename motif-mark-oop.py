@@ -8,18 +8,20 @@ import random
 # 2/27/2025
 
 #TODO: 
-# - deal with the weird ys in the unique motifs list
-# - basically scale nt to pixels
-# - draw exons to scale
 # - add labels and key
 # - find better ways to add color
-# - ignore case in motif sequences
+# - add docstrings for all functions
+# - clean everything up, maybe an exon object
+# - make cleaner global variables
 
 #TODONE:
-# - ignore case in motif sequences, DONE
-# - ignore reverse compliment, DONE
-# - allow for the printout of multiple record graphs DONE, may need tweaks
+# - basically scale nt to pixels, DONE, need to validate
+# - draw exons to scale, DONE, need validation
+# - ignore reverse compliment, DONE, need to validate
+# - ignore case in motif sequences, DONE, need to validate
+# - allow for the printout of multiple record graphs DONE, need to validate
 # - Convert all Us to Ts before doing anything, DONE, need to validate
+# - deal with the weird ys in the unique motifs list, DONE, need to validate
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--fasta",)  
@@ -38,9 +40,10 @@ class FastaRecord:
         self.gene = self.parse_gene(header)
         self.unique_motif_list = unique_motif_list
         self.motif_object_list = self.find_motifs(self.seq, self.unique_motif_list, record_num)
-        self.exon_start, self.exon_stop = self.get_exon_range(seq)
+        self.multiplier = (1400 - (2 * 25)) / self.length
         self.record_num = record_num
-
+        self.exon_object = Exon(self.seq, self.multiplier, self.record_num)
+        
     
     def parse_gene(self, header):
         '''Pulls gene out of fasta header, assumes its the first letters & numbers
@@ -56,26 +59,15 @@ class FastaRecord:
             elif seq[i] == "u": seq[i] = "t"
         return seq
     
-        
-    def get_exon_range(self, seq):
-        '''Gets the exon from the given sequence provided it has one, determines
-        this by getting the first and last capital letter in the sequence'''
-        capital_letters = list(re.finditer(r'[A-Z]', seq))
-        exon_start = capital_letters[0].start()
-        exon_stop = capital_letters[-1].start()
-
-        return exon_start, exon_stop
-    
     def build_regex(self,motif):
+        '''Returns regex of given motif, will handle Ys accordingly, ignores case'''
         motif = motif.lower()
         list_motif = list(motif)
-        '''Returns regex of given motif, will handle Ys accordingly, ignores case'''
         for i, base in enumerate(list_motif):
             if base == "y":
                 list_motif[i] = "[ct]"
 
         str_motif = ''.join(list_motif)
-        print(str_motif)
         return str_motif
     
     def find_motifs(self, seq, unique_motif_list, record_num):
@@ -103,16 +95,36 @@ class FastaRecord:
         ctx.move_to(25,(175 + (350 * record_num)))
         ctx.line_to(1375, (175 + (350 * record_num)))
         ctx.set_line_width(5)
-
         ctx.stroke()
 
+# def convert_exon_bp_to_pixels(bp_num, seq_num_bp, screen_width, margin_width):
+#     drawing_range = screen_width - (2 * margin_width)
+#     multiplier = (screen_width - (2 * margin_width)) / seq_num_bp
+#     return (bp_num * multiplier) + margin_width
+
+class Exon:
+    def __init__(self, seq, multiplier, record_num):
+        self.exon_start, self.exon_stop = self.get_exon_range(seq)
+        self.exon_length = self.exon_stop - self.exon_start
+        self.seq_length = len(seq)
+        self.multiplier = multiplier
+        self.record_num = record_num
+
+    def get_exon_range(self, seq):
+        '''Gets the exon from the given sequence provided it has one, determines
+        this by getting the first and last capital letter in the sequence'''
+        capital_letters = list(re.finditer(r'[A-Z]', seq))
+        exon_start = capital_letters[0].start()
+        exon_stop = capital_letters[-1].start()
+
+        return exon_start, exon_stop
+
+    def draw_exon(self):
         # Set Exon, fill, stroke
         ctx.set_source_rgb(0.4, 0.9, 0.4)
-        ctx.rectangle(200, (150 + (350 * record_num)), 300, 50)
-
+        ctx.rectangle((self.exon_start * self.multiplier) + 25, (150 + (350 * self.record_num)), (self.exon_length * self.multiplier), 50)
         ctx.fill()
         ctx.stroke()
-        return 0
 
 
 class Motif:
@@ -130,7 +142,7 @@ class Motif:
         r, g, b = self.color
 
         ctx.set_source_rgb(r/255, g/255, b/255)
-        ctx.rectangle(x, (y + (record_num * 350)), 5, 50)
+        ctx.rectangle(convert_bp_to_pixels(x, self.seq_length, 1400, 25), (y + (record_num * 350)), 5, 50) # record num adjusts which graph it needs to be placed on, on the page
         ctx.fill()
         ctx.stroke()
 
@@ -141,8 +153,9 @@ def random_color_generator():
     b = random.randint(0, 255)
     return (r, g, b)
 
-def convert_bp_to_pixels(basepairs):
-    return None
+def convert_bp_to_pixels(bp_num, seq_num_bp, screen_width, margin_width):
+    multiplier = (screen_width - (2 * margin_width)) / seq_num_bp
+    return (bp_num * multiplier) + margin_width
 
 def get_length_of_file(filepath):
     with open("temp_oneline.fasta", 'r') as file:
@@ -183,6 +196,7 @@ with open("temp_oneline.fasta", 'r') as fasta:
 
         record = FastaRecord(header, seq, unique_motif_list, record_num)
         record.draw_graph(record.record_num)
+        record.exon_object.draw_exon()
 
         for motif in record.motif_object_list:
             motif.draw_line(motif.motif_start,150, motif.record_num)
@@ -193,17 +207,4 @@ with open("temp_oneline.fasta", 'r') as fasta:
 os.remove('temp_oneline.fasta')
 surface.write_to_png('test_rect_and_line.png')
 
-
-# def build_regex(motif):
-#         motif = motif.lower()
-#         list_motif = list(motif)
-#         '''Returns regex of given motif, will handle Ys accordingly, ignores case'''
-#         for i, base in enumerate(list_motif):
-#             if base == "y":
-#                 list_motif[i] = "[ct]"
-
-#         return ''.join(list_motif)
-
-# x = build_regex("atcyatcyyaaa")
-# print(x)
     
