@@ -230,7 +230,7 @@ bioinfo.oneline_fasta(args.fasta, "temp_oneline.fasta")
 
 
 # Load the image using PIL (Pillow)
-image = Image.open("/Users/cameronkunstadt/Downloads/semi_transparent_stretched_milk_cat.png")
+image = Image.open("semi_transparent_stretched_milk_cat.png")
 image_width, image_height = image.size
 image = image.convert("RGBA")
 image_data = image.tobytes("raw", "BGRA")
