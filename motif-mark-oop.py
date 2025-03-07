@@ -2,7 +2,6 @@ import argparse
 import re, os
 import bioinfo
 import cairo
-import random
 import itertools
 from PIL import Image
 # Cameron Kunstadt
@@ -10,20 +9,7 @@ from PIL import Image
 # 2/27/2025
 
 #TODO: 
-# - Clean, check and validate
-
-#TODONE:
-# - add key
-# - find better ways to add color
-# - make cleaner global variables, DONE
-# - add labels, DONE
-# - basically scale nt to pixels, DONE, need to validate
-# - draw exons to scale, DONE, need validation
-# - ignore reverse compliment, DONE, need to validate
-# - ignore case in motif sequences, DONE, need to validate
-# - allow for the printout of multiple record graphs DONE, need to validate
-# - Convert all Us to Ts before doing anything, DONE, need to validate
-# - deal with the weird ys in the unique motifs list, DONE, need to validate
+# - Clean, check and validate, also add try/catch for image use
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--fasta",)  
@@ -31,7 +17,7 @@ parser.add_argument('-m', "--motif")
 args = parser.parse_args()
 
 # GLOBAL
-screen_size = 2000
+screen_width = 2000
 margin_size = 25
 color_palette = [
     (230, 0, 73),
@@ -55,27 +41,21 @@ class FastaRecord:
         self.gene_object = Gene(header, record_num)
         self.unique_motif_list = unique_motif_list
         self.motif_object_list = self.find_motifs(self.seq, self.unique_motif_list, record_num)
-        self.multiplier = (screen_size - (2 * margin_size)) / len(seq)
+        self.multiplier = (screen_width - (2 * margin_size)) / len(seq)
         self.record_num = record_num
         self.exon_object = Exon(self.seq, self.multiplier, self.record_num)
     
     def convert_U_to_T(self, seq):
         '''Converts all Us in the file to Ts'''
-        for i in range(0, len(seq)):
-            if seq[i] == "U": seq[i] = "T"
-            elif seq[i] == "u": seq[i] = "t"
+        seq = seq.replace("U", "T")
+        seq = seq.replace("u", "t")
         return seq
     
     def build_regex(self,motif):
         '''Returns regex of given motif, will handle Ys accordingly, ignores case'''
         motif = motif.lower()
-        list_motif = list(motif)
-        for i, base in enumerate(list_motif):
-            if base == "y":
-                list_motif[i] = "[ct]"
-
-        str_motif = ''.join(list_motif)
-        return str_motif
+        motif = motif.replace("y", "[ct]")
+        return motif
     
     def find_motifs(self, seq, unique_motif_list, record_num):
         '''Searches for all the instances of motifs in the given sequence
@@ -85,7 +65,7 @@ class FastaRecord:
 
         for unique_motif_object in unique_motif_list:
             unique_motif = unique_motif_object.motif.lower()
-            #unique_motif = unique_motif.lower()
+            unique_motif = self.convert_U_to_T(unique_motif)
             motif_instances = list(re.finditer(self.build_regex(unique_motif), seq))
             for motif_instance in motif_instances:
                 motif_span = motif_instance.span()
@@ -97,12 +77,12 @@ class FastaRecord:
 
         return motif_objects_list
     
-    def draw_graph(self, record_num):
+    def draw_graph(self):
         '''Draws horizontal line to represent sequence'''
         # Set main line as black, stroke
         ctx.set_source_rgb(0, 0, 0)
-        ctx.move_to(margin_size,(175 + (350 * record_num)))
-        ctx.line_to(screen_size-25, (175 + (350 * record_num)))
+        ctx.move_to(margin_size,(175 + (350 * self.record_num)))
+        ctx.line_to(screen_width-25, (175 + (350 * self.record_num)))
         ctx.set_line_width(5)
         ctx.stroke()
 
@@ -167,7 +147,7 @@ class UniqueMotif:
         ctx.set_source_rgb(0, 0, 0) 
         ctx.set_font_size(30) 
         ctx.select_font_face("Papyrus", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL) 
-        ctx.move_to(50, 1350 + (self.motif_num * 50)) 
+        ctx.move_to(50, (screen_height - 250) + (self.motif_num * 50)) 
         ctx.show_text(self.motif) 
         ctx.stroke()
 
@@ -176,7 +156,7 @@ class UniqueMotif:
         r, g, b = self.color
 
         ctx.set_source_rgb(r/255, g/255, b/255)
-        ctx.rectangle(250 , 1335 + (self.motif_num * 50), 25, 25)
+        ctx.rectangle(250 , (screen_height - 260) + (self.motif_num * 50), 25, 25)
         ctx.fill()
         ctx.stroke()
 
@@ -194,9 +174,11 @@ class MotifInstance(UniqueMotif):
         '''Draws small vertical line at corresponding points in the sequence graph to represent a found motif'''
         r, g, b = self.color
         ctx.set_source_rgb(r/255, g/255, b/255)
-        ctx.rectangle(convert_bp_to_pixels(self.motif_start, self.seq_length, screen_size, 25), (y + (self.record_num * 350)), 5, 50) # record num adjusts which graph it needs to be placed on, on the page
+        ctx.rectangle(convert_bp_to_pixels(self.motif_start, self.seq_length, screen_width, 25), (y + (self.record_num * 350)), 5, 50) # record num adjusts which graph it needs to be placed on, on the page
         ctx.fill()
         ctx.stroke() 
+
+
 
 def convert_bp_to_pixels(bp_num, seq_length, screen_width, margin_width):
     '''Based on screen with, size of the margin, and sequence length, this converts a given basepair
@@ -216,6 +198,7 @@ def cycle_colors():
 
 color_generator = cycle_colors()
 
+
 # Create unique list of motifs, assign each a unique random color and put into dictionary
 unique_motif_list = []
 
@@ -228,26 +211,30 @@ with open(args.motif, 'r') as motif_file:
 # Not assuming the incoming file is oneline, so a temp one-line fasta file is created, we also get the number of lines to define the length of the image
 bioinfo.oneline_fasta(args.fasta, "temp_oneline.fasta")
 
-
-# Load the image using PIL (Pillow)
-image = Image.open("semi_transparent_stretched_milk_cat.png")
-image_width, image_height = image.size
-image = image.convert("RGBA")
-image_data = image.tobytes("raw", "BGRA")
-
-# Surface from the image data
-image_surface = cairo.ImageSurface.create_for_data(
-    bytearray(image_data), cairo.FORMAT_ARGB32, image_width, image_height)
+screen_height = int(determine_length_of_surface("temp_oneline.fasta"))
 
 # Set surface, paint white
-surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, screen_size, int(determine_length_of_surface("temp_oneline.fasta")))
+surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, screen_width, screen_height)
 ctx = cairo.Context(surface)
 ctx.set_source_rgb(255, 255, 255)
 ctx.paint()
 
-# Draw the image in top left corner
-ctx.set_source_surface(image_surface, 0, 0)
-ctx.paint()
+try:
+    # Load the image using PIL (Pillow)
+    image = Image.open("semi_transparent_stretched_milk_cat.png")
+    image_width, image_height = image.size
+    image = image.convert("RGBA")
+    image_data = image.tobytes("raw", "BGRA")
+
+    # Surface from the image data
+    image_surface = cairo.ImageSurface.create_for_data(
+    bytearray(image_data), cairo.FORMAT_ARGB32, image_width, image_height)
+
+    # Draw the image in top left corner
+    ctx.set_source_surface(image_surface, 0, 0)
+    ctx.paint()
+except:
+    print("cant find image, leaving out")
 
 
 with open("temp_oneline.fasta", 'r') as fasta:
@@ -259,7 +246,7 @@ with open("temp_oneline.fasta", 'r') as fasta:
         seq = fasta.readline()
 
         record = FastaRecord(header, seq, unique_motif_list, record_num)
-        record.draw_graph(record.record_num)
+        record.draw_graph()
         record.exon_object.draw_exon()
         record.gene_object.write_gene()
 
@@ -274,6 +261,9 @@ with open("temp_oneline.fasta", 'r') as fasta:
 
 
 os.remove('temp_oneline.fasta')
-surface.write_to_png('test_rect_and_line.png')
+
+prefix = args.fasta.replace(".fasta", "")
+prefix = prefix.replace(".fa", "")
+surface.write_to_png(f'{prefix}.png')
 
     
