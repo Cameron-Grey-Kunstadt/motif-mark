@@ -125,7 +125,7 @@ class Gene:
         # Color, size, font, position, text
         ctx.set_source_rgb(0, 0, 0) 
         ctx.set_font_size(40) 
-        ctx.select_font_face("Papyrus", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL) 
+        ctx.select_font_face("Arial", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL) 
         ctx.move_to(50, 50 + (self.record_num * 350)) 
         ctx.show_text(self.gene_name) 
         ctx.stroke() 
@@ -142,7 +142,7 @@ class UniqueMotif:
         '''Writes the gene name for the key in the bottom right of the graph'''
         ctx.set_source_rgb(0, 0, 0) 
         ctx.set_font_size(30) 
-        ctx.select_font_face("Papyrus", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL) 
+        ctx.select_font_face("Arial", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL) 
         ctx.move_to(50, (screen_height - 250) + (self.motif_num * 50)) 
         ctx.show_text(self.motif) 
         ctx.stroke()
