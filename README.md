@@ -29,5 +29,8 @@ Single png file, filename is based on the input fasta file
 **Example_Image.png** an example of how the graphs can look
 
 **Funny_Example_Image.png** an example of how the graphs look if you like to have fun
+
 #### Notes
-This code used to have a section where it could put a photo in the background of the graph, but as that required the use of additional packages, it was removed.
+- This code used to have a section where it could put a photo in the background of the graph, but as that required the use of additional packages, it was removed
+- A color cycler is used to run through whatever color pallete you define at the beginning, feel free to make better use of the colors and fonts of this tool.
+
