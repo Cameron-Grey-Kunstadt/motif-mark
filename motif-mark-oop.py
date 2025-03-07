@@ -3,13 +3,9 @@ import re, os
 import bioinfo
 import cairo
 import itertools
-from PIL import Image
 # Cameron Kunstadt
 # UO BGMP
 # 2/27/2025
-
-#TODO: 
-# - Clean, check and validate, also add try/catch for image use
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--fasta",)  
@@ -18,7 +14,7 @@ args = parser.parse_args()
 
 # GLOBAL
 screen_width = 2000
-margin_size = 25
+margin_width = 25
 color_palette = [
     (230, 0, 73),
     (11, 180, 255),
@@ -34,14 +30,14 @@ color_palette = [
 class FastaRecord:
     '''A FastaRecord object serves to parse and hold useful information from a FASTA header
     and a FASTA sequence, and to find motifs within the sequence, based on the given unique_motif_list.
-    Motifs are create as Motif objects, and saved in a list.'''
+    Motifs are create as MotifInstance objects, and saved in a list.'''
     def __init__(self, header, seq, unique_motif_list, record_num):
         self.header = header
         self.seq = self.convert_U_to_T(seq)
         self.gene_object = Gene(header, record_num)
         self.unique_motif_list = unique_motif_list
         self.motif_object_list = self.find_motifs(self.seq, self.unique_motif_list, record_num)
-        self.multiplier = (screen_width - (2 * margin_size)) / len(seq)
+        self.multiplier = (screen_width - (2 * margin_width)) / len(seq)
         self.record_num = record_num
         self.exon_object = Exon(self.seq, self.multiplier, self.record_num)
     
@@ -81,7 +77,7 @@ class FastaRecord:
         '''Draws horizontal line to represent sequence'''
         # Set main line as black, stroke
         ctx.set_source_rgb(0, 0, 0)
-        ctx.move_to(margin_size,(175 + (350 * self.record_num)))
+        ctx.move_to(margin_width,(175 + (350 * self.record_num)))
         ctx.line_to(screen_width-25, (175 + (350 * self.record_num)))
         ctx.set_line_width(5)
         ctx.stroke()
@@ -108,7 +104,7 @@ class Exon:
         # Set Exon, fill, stroke
         r, g, b = color_palette[8]
         ctx.set_source_rgb(r/255, g/255, b/255)
-        ctx.rectangle((self.exon_start * self.multiplier) + margin_size, (150 + (350 * self.record_num)), (self.exon_length * self.multiplier), 50)
+        ctx.rectangle((self.exon_start * self.multiplier) + margin_width, (150 + (350 * self.record_num)), (self.exon_length * self.multiplier), 50)
         ctx.fill()
         ctx.stroke()
 
@@ -174,17 +170,17 @@ class MotifInstance(UniqueMotif):
         '''Draws small vertical line at corresponding points in the sequence graph to represent a found motif'''
         r, g, b = self.color
         ctx.set_source_rgb(r/255, g/255, b/255)
-        ctx.rectangle(convert_bp_to_pixels(self.motif_start, self.seq_length, screen_width, 25), (y + (self.record_num * 350)), 5, 50) # record num adjusts which graph it needs to be placed on, on the page
+        ctx.rectangle(convert_bp_to_pixels(self.motif_start, self.seq_length), (y + (self.record_num * 350)), 5, 50) # record num adjusts which graph it needs to be placed on, on the page
         ctx.fill()
         ctx.stroke() 
 
 
 
-def convert_bp_to_pixels(bp_num, seq_length, screen_width, margin_width):
+def convert_bp_to_pixels(bp_loc, seq_length):
     '''Based on screen with, size of the margin, and sequence length, this converts a given basepair
     location within the sequence to where it should appear on the actual screen'''
     multiplier = (screen_width - (2 * margin_width)) / seq_length
-    return (bp_num * multiplier) + margin_width
+    return (bp_loc * multiplier) + margin_width
 
 def determine_length_of_surface(filepath):
     '''Determines the needed length of the surface based on how many records there are'''
@@ -218,24 +214,6 @@ surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, screen_width, screen_height)
 ctx = cairo.Context(surface)
 ctx.set_source_rgb(255, 255, 255)
 ctx.paint()
-
-try:
-    # Load the image using PIL (Pillow)
-    image = Image.open("semi_transparent_stretched_milk_cat.png")
-    image_width, image_height = image.size
-    image = image.convert("RGBA")
-    image_data = image.tobytes("raw", "BGRA")
-
-    # Surface from the image data
-    image_surface = cairo.ImageSurface.create_for_data(
-    bytearray(image_data), cairo.FORMAT_ARGB32, image_width, image_height)
-
-    # Draw the image in top left corner
-    ctx.set_source_surface(image_surface, 0, 0)
-    ctx.paint()
-except:
-    print("cant find image, leaving out")
-
 
 with open("temp_oneline.fasta", 'r') as fasta:
     record_num = 0
